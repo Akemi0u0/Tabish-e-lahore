@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Lahore Map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{--bg:#e8e6e0;--ink:#1c1f23;--mut:#5d646c;--card:#fff;--line:#d9dce0;--acc:#0f766e;--edit:#d97706;--danger:#b91c1c}
+@media(prefers-color-scheme:dark){:root{--ink:#eef0f2;--mut:#a3abb3;--card:#1f2327;--line:#363c42}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink)}
+#map{position:fixed;inset:0;background:var(--bg)}
+body.edit #map{box-shadow:inset 0 0 0 4px var(--edit)}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:9px 16px;min-height:40px}
+button:hover{border-color:var(--acc)}button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button.pri{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+button.dng{color:var(--danger)}
+#bar{position:fixed;z-index:1000;top:calc(12px + env(safe-area-inset-top,0px));left:12px;display:flex;gap:8px}
+#bar button{box-shadow:0 2px 8px #0003}
+body:not(.edit) .eo,body.edit .vo{display:none}
+#pill{position:fixed;z-index:1000;top:calc(12px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:var(--edit);color:#fff;padding:6px 14px;border-radius:99px;font-size:13px;font-weight:600;display:none;white-space:nowrap}
+body.edit #pill{display:block}
+@media(max-width:600px){#pill{top:auto;bottom:calc(12px + env(safe-area-inset-bottom,0px));font-size:12px}}
+.leaflet-control-zoom{border:none!important;box-shadow:0 2px 8px #0003!important}
+.leaflet-control-zoom a{width:40px!important;height:40px!important;line-height:40px!important;font-size:20px!important}
+.pin svg{filter:drop-shadow(0 2px 2px #0006)}
+body.edit .pin path{fill:var(--edit)}
+aside,#ed{position:fixed;z-index:1100;background:var(--card);box-shadow:0 0 24px #0004;overflow:auto;padding:20px}
+#pn{top:0;right:0;bottom:0;width:min(420px,100vw);transform:translateX(105%);transition:transform .28s ease;padding-top:calc(20px + env(safe-area-inset-top,0px))}
+#pn.open{transform:none}
+@media(max-width:600px){#pn{width:100vw}}
+#x{position:absolute;top:10px;right:10px;width:40px;padding:0;font-size:20px;border:none;background:transparent}
+#pc{margin-top:28px}#pc h2{margin:0 0 10px;font-size:22px;line-height:1.25;padding-right:30px}
+#pc p{margin:0 0 16px;white-space:pre-wrap;overflow-wrap:anywhere}
+#pc .g{display:flex;flex-direction:column;gap:10px}#pc img{width:100%;height:auto;border-radius:8px;cursor:zoom-in;display:block}
+#ed{display:none;top:calc(64px + env(safe-area-inset-top,0px));left:12px;width:min(360px,calc(100vw - 24px));max-height:calc(100% - 90px);border-radius:14px}
+#ed.open{display:block}
+@media(max-width:600px){#ed{top:auto;bottom:0;left:0;width:100vw;max-height:70%;border-radius:14px 14px 0 0}}
+#ed label{display:block;font-size:13px;font-weight:600;margin:12px 0 4px}
+#ed input[type=text],#ed textarea{width:100%;font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit}
+#ed textarea{min-height:100px;resize:vertical}
+#th{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:8px}
+.t{border:1px solid var(--line);border-radius:8px;overflow:hidden}.t img{width:100%;height:70px;object-fit:cover;display:block}
+.t div{display:flex}.t button{flex:1;min-height:30px;padding:0;border:none;border-top:1px solid var(--line);border-radius:0}
+.row{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}.hint{color:var(--mut);font-size:12.5px;margin:8px 0 0}
+#lb{position:fixed;inset:0;z-index:2000;background:#000d;display:none;align-items:center;justify-content:center;cursor:zoom-out}
+#lb.open{display:flex}#lb img{max-width:96vw;max-height:94vh;object-fit:contain}
+#ld{position:fixed;inset:0;z-index:3000;background:var(--bg);display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:#333}
+#ts{position:fixed;z-index:2500;left:50%;bottom:70px;transform:translateX(-50%);background:#222;color:#fff;padding:8px 14px;border-radius:8px;display:none;font-size:14px}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="bar">
+  <button id="eb" class="vo pri">Edit</button>
+  <button id="sb" class="eo pri">Save</button>
+  <button id="cb" class="eo">Cancel</button>
+</div>
+<div id="pill">Edit mode · click inside Lahore to add a marker</div>
+<aside id="pn" aria-hidden="true"><button id="x" aria-label="Close panel">✕</button><div id="pc"></div></aside>
+<div id="ed" role="dialog" aria-label="Marker editor">
+  <label for="nm">Name</label><input id="nm" type="text" autocomplete="off">
+  <label for="ds">Description</label><textarea id="ds"></textarea>
+  <label for="fi">Pictures</label><input id="fi" type="file" accept="image/*" multiple>
+  <div id="th"></div>
+  <p class="hint">Drag the pin on the map to reposition it.</p>
+  <div class="row"><button id="ok" class="pri">Done</button><button id="ec">Cancel</button><button id="dl" class="dng">Delete</button></div>
+</div>
+<div id="lb"><img alt=""></div>
+<div id="ts" role="status"></div>
+<div id="ld">Loading Lahore boundary…</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+// ---------- Config ----------
+const CFG = {
+  // Boundary is fetched once from OpenStreetMap (Nominatim), then cached in IndexedDB.
+  boundaryQuery: 'Lahore District',
+  // Swap for a commercial/self-hosted OSM tile provider before heavy production use.
+  tiles: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+};
+const $ = s => document.querySelector(s);
+const cl = o => structuredClone(o);
+const toast = m => { const t = $('#ts'); t.textContent = m; t.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = 'none', 2600); };
+
+// ---------- IndexedDB (markers + image Blobs live in the same record) ----------
+const dbp = new Promise((res, rej) => {
+  const r = indexedDB.open('lahore-map', 1);
+  r.onupgradeneeded = () => { r.result.createObjectStore('markers', { keyPath: 'id' }); r.result.createObjectStore('meta'); };
+  r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+});
+const tx = async (store, mode, fn) => {
+  const d = await dbp;
+  return new Promise((res, rej) => {
+    const t = d.transaction(store, mode), out = fn(t.objectStore(store));
+    t.oncomplete = () => res(out && out.result); t.onerror = t.onabort = () => rej(t.error);
+  });
+};
+
+// ---------- State ----------
+let map, geo, layer, saved = [], draft = null, mode = 'view', dirty = false, cur = null, snap = null, isNew = false, urls = [];
+const list = () => mode === 'edit' ? draft : saved;
+
+// ---------- Geometry ----------
+function ringHas(r, x, y) {
+  let c = false;
+  for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+    const [xi, yi] = r[i], [xj, yj] = r[j];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c;
+  }
+  return c;
+}
+const inside = (lng, lat) => (geo.type === 'Polygon' ? [geo.coordinates] : geo.coordinates)
+  .some(p => ringHas(p[0], lng, lat) && !p.slice(1).some(h => ringHas(h, lng, lat)));
+
+async function loadBoundary() {
+  let g = await tx('meta', 'readonly', s => s.get('boundary'));
+  if (g) return g;
+  const u = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&countrycodes=pk&accept-language=en&polygon_geojson=1&polygon_threshold=0.0004&q=' + encodeURIComponent(CFG.boundaryQuery);
+  const rs = await (await fetch(u)).json();
+  const hit = rs.find(r => r.category === 'boundary' && /Polygon/.test(r.geojson.type)) || rs.find(r => /Polygon/.test(r.geojson.type));
+  if (!hit) throw new Error('No polygon boundary returned');
+  console.info('Boundary used:', hit.display_name, 'OSM', hit.osm_type, hit.osm_id);
+  await tx('meta', 'readwrite', s => s.put(hit.geojson, 'boundary'));
+  return hit.geojson;
+}
+
+// ---------- Map ----------
+function initMap() {
+  map = L.map('map', { zoomControl: false, zoomSnap: .25, maxBoundsViscosity: 1, maxZoom: 19 });
+  L.control.zoom({ position: 'bottomleft' }).addTo(map);
+  L.tileLayer(CFG.tiles, { attribution: CFG.attribution, maxZoom: 19 }).addTo(map);
+  const b = L.geoJSON(geo).getBounds();
+  map.fitBounds(b, { animate: false });
+  map.setMinZoom(map.getZoom());
+  map.setMaxBounds(b.pad(.04));
+  // Mask: world rectangle with the real boundary rings cut out (even-odd). Inside stays interactive.
+  map.createPane('mask').style.zIndex = 450; map.getPane('mask').style.pointerEvents = 'none';
+  const rings = [];
+  (geo.type === 'Polygon' ? [geo.coordinates] : geo.coordinates).forEach(p => p.forEach(r => rings.push(r.map(c => [c[1], c[0]]))));
+  const world = [[89, -540], [89, 540], [-89, 540], [-89, -540]];
+  L.polygon([world, ...rings], { pane: 'mask', stroke: false, fillColor: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(), fillOpacity: 1, fillRule: 'evenodd', interactive: false }).addTo(map);
+  L.geoJSON(geo, { pane: 'mask', style: { color: '#0f766e', weight: 2, fill: false }, interactive: false }).addTo(map);
+  layer = L.layerGroup().addTo(map);
+  map.on('click', e => {
+    if (mode !== 'edit' || cur) return;
+    if (!inside(e.latlng.lng, e.latlng.lat)) return toast('That spot is outside Lahore.');
+    const m = { id: crypto.randomUUID(), name: '', desc: '', lat: e.latlng.lat, lng: e.latlng.lng, images: [], t: Date.now() };
+    draft.push(m); dirty = true; render(); openEditor(m, true);
+  });
+}
+const pinIcon = L.divIcon({ className: 'pin', iconSize: [28, 38], iconAnchor: [14, 38],
+  html: '<svg width="28" height="38" viewBox="0 0 28 38"><path d="M14 0C6.3 0 0 6.2 0 13.8 0 24 14 38 14 38s14-14 14-24.2C28 6.2 21.7 0 14 0z" fill="#0f766e"/><circle cx="14" cy="14" r="5" fill="#fff"/></svg>' });
+function render() {
+  layer.clearLayers();
+  list().forEach(m => {
+    const mk = L.marker([m.lat, m.lng], { icon: pinIcon, draggable: mode === 'edit', keyboard: true, title: m.name || '' }).addTo(layer);
+    mk.on('click', () => mode === 'edit' ? (cur && cur !== m ? closeEditor(true) : 0, openEditor(m)) : openPanel(m.id));
+    mk.on('dragend', () => {
+      const p = mk.getLatLng();
+      if (!inside(p.lng, p.lat)) { mk.setLatLng([m.lat, m.lng]); return toast('Markers must stay inside Lahore.'); }
+      m.lat = p.lat; m.lng = p.lng; dirty = true;
+    });
+  });
+}
+
+// ---------- View panel (only saved user content) ----------
+function openPanel(id) {
+  const m = saved.find(x => x.id === id); if (!m) return;
+  const c = $('#pc'); c.replaceChildren(); revoke();
+  if (m.name) { const h = document.createElement('h2'); h.textContent = m.name; c.append(h); }
+  if (m.desc) { const p = document.createElement('p'); p.textContent = m.desc; c.append(p); }
+  if (m.images.length) {
+    const g = document.createElement('div'); g.className = 'g';
+    m.images.forEach(im => { const i = new Image(); i.src = url(im.blob); i.alt = m.name || 'Photo'; i.onclick = () => showLb(i.src); g.append(i); });
+    c.append(g);
+  }
+  $('#pn').classList.add('open'); $('#pn').setAttribute('aria-hidden', 'false'); $('#x').focus();
+}
+function closePanel() { $('#pn').classList.remove('open'); $('#pn').setAttribute('aria-hidden', 'true'); }
+const url = b => { const u = URL.createObjectURL(b); urls.push(u); return u; };
+const revoke = () => { urls.forEach(URL.revokeObjectURL); urls = []; };
+const showLb = s => { $('#lb img').src = s; $('#lb').classList.add('open'); };
+$('#lb').onclick = () => $('#lb').classList.remove('open');
+$('#x').onclick = closePanel;
+addEventListener('keydown', e => { if (e.key === 'Escape') { $('#lb').classList.remove('open'); closePanel(); } });
+
+// ---------- Editor ----------
+function openEditor(m, fresh) {
+  cur = m; isNew = !!fresh; snap = cl(m);
+  $('#nm').value = m.name; $('#ds').value = m.desc; $('#fi').value = '';
+  thumbs(); $('#ed').classList.add('open'); $('#nm').focus();
+}
+function thumbs() {
+  const t = $('#th'); t.replaceChildren(); revoke();
+  cur.images.forEach((im, i) => {
+    const d = document.createElement('div'); d.className = 't';
+    const img = new Image(); img.src = url(im.blob); img.alt = 'Picture ' + (i + 1);
+    const r = document.createElement('div');
+    [['◀', -1, 'Move earlier'], ['▶', 1, 'Move later'], ['✕', 0, 'Remove picture']].forEach(([l, dir, a]) => {
+      const b = document.createElement('button'); b.textContent = l; b.setAttribute('aria-label', a);
+      b.onclick = () => {
+        if (!dir) cur.images.splice(i, 1);
+        else { const j = i + dir; if (j < 0 || j >= cur.images.length) return; [cur.images[i], cur.images[j]] = [cur.images[j], cur.images[i]]; }
+        dirty = true; thumbs();
+      };
+      r.append(b);
+    });
+    d.append(img, r); t.append(d);
+  });
+}
+$('#nm').oninput = e => { if (cur) { cur.name = e.target.value; dirty = true; } };
+$('#ds').oninput = e => { if (cur) { cur.desc = e.target.value; dirty = true; } };
+$('#fi').onchange = e => {
+  const fs = [...e.target.files].filter(f => f.type.startsWith('image/'));
+  if (fs.length < e.target.files.length) toast('Non-image files were skipped.');
+  fs.forEach(f => cur.images.push({ id: crypto.randomUUID(), blob: f }));
+  if (fs.length) dirty = true; e.target.value = ''; thumbs();
+};
+function closeEditor(keep) {
+  $('#ed').classList.remove('open'); revoke();
+  if (!keep && cur) { /* Done: edits already live in draft */ }
+  cur = null; render();
+}
+$('#ok').onclick = () => closeEditor();
+$('#ec').onclick = () => {
+  if (isNew) draft.splice(draft.findIndex(x => x.id === cur.id), 1); else Object.assign(cur, snap);
+  closeEditor(); dirty = draft.some((m, i) => JSON.stringify(m.name + m.desc + m.lat + m.lng + m.images.map(x => x.id)) !== JSON.stringify((saved.find(s => s.id === m.id) || {}).name + '')) && isDirty();
+};
+$('#dl').onclick = () => {
+  if (!confirm('Delete this marker and its pictures? This takes effect when you press Save.')) return;
+  draft.splice(draft.findIndex(x => x.id === cur.id), 1); dirty = true; closeEditor();
+};
+// Precise dirty check against last saved state
+function isDirty() {
+  const key = m => [m.id, m.name, m.desc, m.lat, m.lng, m.images.map(i => i.id).join()].join('|');
+  return draft.length !== saved.length || draft.some((m, i) => key(m) !== key(saved[i]));
+}
+
+// ---------- Edit / Save workflow ----------
+$('#eb').onclick = () => { draft = saved.map(cl); dirty = false; mode = 'edit'; document.body.classList.add('edit'); closePanel(); render(); };
+function exitEdit() { if (cur) closeEditor(); mode = 'view'; draft = null; dirty = false; document.body.classList.remove('edit'); render(); }
+$('#cb').onclick = () => {
+  if (cur) { dirty = dirty || false; }
+  if ((dirty && isDirty()) && !confirm('Discard unsaved changes?')) return;
+  exitEdit();
+};
+$('#sb').onclick = async () => {
+  if (cur) closeEditor();
+  for (const m of draft) {
+    if (!isFinite(m.lat) || !isFinite(m.lng) || !inside(m.lng, m.lat)) return toast('A marker is outside Lahore — move or delete it.');
+    if (m.images.some(i => !(i.blob instanceof Blob))) return toast('An image is invalid — remove and re-add it.');
+  }
+  try {
+    await tx('markers', 'readwrite', s => { s.clear(); draft.forEach(m => s.put(m)); });
+  } catch (err) { return toast('Save failed: ' + (err && err.message || 'storage error')); }
+  saved = draft.map(cl); exitEdit(); toast('Saved.');
+};
+addEventListener('beforeunload', e => { if (mode === 'edit' && dirty && isDirty()) { e.preventDefault(); e.returnValue = ''; } });
+
+// ---------- Boot ----------
+(async () => {
+  try {
+    saved = (await tx('markers', 'readonly', s => s.getAll())).sort((a, b) => a.t - b.t);
+    geo = await loadBoundary();
+    initMap(); render(); $('#ld').remove();
+  } catch (e) {
+    console.error(e);
+    $('#ld').textContent = 'Could not load the Lahore boundary (' + e.message + '). Check your connection and reload.';
+  }
+})();
+</script>
+</body>
+</html>
